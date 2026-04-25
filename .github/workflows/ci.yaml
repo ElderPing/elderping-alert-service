@@ -38,7 +38,7 @@ jobs:
     needs: sca
     uses: ElderPing/elderping-shared/.github/workflows/_notify.yml@v1.0.0
     with:
-      subject: "Snyk Critical Vulnerabilities Found - elderpinq-alert-service"
+      subject: "Snyk Critical Vulnerabilities Found -  elderping-alert-service"
       body: "Critical or high vulnerabilities were found in elderping-alert-service. Please review the attached report."
       service-name: elderping-alert-service
       artifact-name: snyk-report-elderping-alert-service
@@ -60,7 +60,7 @@ jobs:
     with:
       subject: "Trivy Critical Vulnerabilities Found - elderping-alert-service"
       body: "Critical or high vulnerabilities were found in the Docker image for elderping-alert-service. Please review the attached report."
-      service-name:  elderping-alert-service
+      service-name: elderping-alert-service
       artifact-name: trivy-elderping-alert-service
     secrets:
       BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
@@ -70,7 +70,7 @@ jobs:
     if: github.event_name == 'push'
     uses: ElderPing/elderping-shared/.github/workflows/_docker-publish.yml@v1.0.0
     with:
-      service-name:  elderping-alert-service
+      service-name: elderping-alert-service
       service-path: .
       environment: ${{ github.ref_name }}
     secrets:
