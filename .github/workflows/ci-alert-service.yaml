@@ -1,0 +1,100 @@
+---
+name: CI/CD — Alert Service
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+  release:
+    types: [created]
+
+permissions:
+  contents: read
+
+jobs:
+  sast:
+    if: github.event_name == 'pull_request'
+    uses: ElderPing/elderping-shared/.github/workflows/ci-sast.yml@main
+    with:
+      service-name: alert-service
+      service-path: .
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_URL: ${{ secrets.SONAR_URL }}
+
+  sca:
+    needs: [sast]
+    if: github.event_name == 'pull_request'
+    uses: ElderPing/elderping-shared/.github/workflows/ci-sca.yml@main
+    with:
+      service-name: alert-service
+      service-path: .
+      runtime: node
+    secrets:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+  trivy:
+    needs: [sca]
+    if: github.event_name == 'pull_request'
+    uses: ElderPing/elderping-shared/.github/workflows/ci-docker-build.yml@main
+    with:
+      service-name: alert-service
+      service-path: .
+
+  pr-check:
+    name: PR Quality Gate
+    needs: [sast, sca, trivy]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "✅ All PR checks passed"
+
+  dev-publish:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    uses: ElderPing/elderping-shared/.github/workflows/ci-docker-publish.yml@main
+    with:
+      service-name: alert-service
+      service-path: .
+      environment: develop
+      target-env: dev
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+  dev-cd:
+    needs: [dev-publish]
+    if: needs.dev-publish.result == 'success'
+    uses: ElderPing/elderping-shared/.github/workflows/cd-template.yml@main
+    with:
+      service-name: alert-service
+      image-tag: ${{ needs.dev-publish.outputs.image-tag }}
+      environment: main
+      target-env: dev
+    secrets:
+      HELM_REPO_PAT: ${{ secrets.HELM_REPO_PAT }}
+
+  publish:
+    if: github.event_name == 'release'
+    uses: ElderPing/elderping-shared/.github/workflows/ci-docker-publish.yml@main
+    with:
+      service-name: alert-service
+      service-path: .
+      environment: main
+      target-env: prod
+      release-tag: ${{ github.event.release.tag_name }}
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+  cd:
+    needs: [publish]
+    if: needs.publish.result == 'success'
+    uses: ElderPing/elderping-shared/.github/workflows/cd-template.yml@main
+    with:
+      service-name: alert-service
+      image-tag: ${{ needs.publish.outputs.image-tag }}
+      environment: main
+      target-env: prod
+    secrets:
+      HELM_REPO_PAT: ${{ secrets.HELM_REPO_PAT }}
